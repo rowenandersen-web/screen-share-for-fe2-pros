@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Victoria to Brazil Screen Share</title>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <style>
+    body { font-family: sans-serif; background: #121212; color: white; text-align: center; padding: 20px; }
+    video { width: 45%; background: #000; border: 2px solid #333; border-radius: 8px; margin: 10px; }
+    input, button { padding: 10px 15px; font-size: 16px; border-radius: 5px; border: none; margin: 5px; }
+    button { background: #5865F2; color: white; cursor: pointer; }
+    button:hover { background: #4752C4; }
+  </style>
+</head>
+<body>
+  <h2>Private Screen Share</h2>
+  <p>Your ID: <strong id="my-id">Connecting...</strong></p>
+  
+  <input type="text" id="friend-id" placeholder="Paste friend's ID here">
+  <button onclick="startScreenShare()">Share My Screen</button>
+
+  <div>
+    <video id="local-video" autoplay muted playsinline></video>
+    <video id="remote-video" autoplay playsinline></video>
+  </div>
+
+  <script>
+    // 1. Connect to PeerJS's free signaling server
+    const peer = new Peer();
+
+    peer.on('open', (id) => {
+      document.getElementById('my-id').innerText = id;
+    });
+
+    // 2. Listen for when your friend shares their screen with you
+    peer.on('call', (call) => {
+      call.answer(); // Answer the call automatically
+      call.on('stream', (remoteStream) => {
+        document.getElementById('remote-video').srcObject = remoteStream;
+      });
+    });
+
+    // 3. Capture your screen and send it to your friend
+    async function startScreenShare() {
+      const friendId = document.getElementById('friend-id').value.trim();
+      if (!friendId) return alert("Enter your friend's ID first!");
+
+      try {
+        // Ask the browser for screen + system audio
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30 },
+          audio: true 
+        });
+
+        document.getElementById('local-video').srcObject = screenStream;
+
+        // Call your friend and send the screen stream
+        peer.call(friendId, screenStream);
+      } catch (err) {
+        console.error("Failed to share screen:", err);
+      }
+    }
+  </script>
+</body>
+</html>
