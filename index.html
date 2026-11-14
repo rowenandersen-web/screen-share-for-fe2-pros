@@ -3,63 +3,245 @@
 <head>
   <meta charset="UTF-8">
   <title>Victoria to Brazil Screen Share</title>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <style>
-    body { font-family: sans-serif; background: #121212; color: white; text-align: center; padding: 20px; }
-    video { width: 45%; background: #000; border: 2px solid #333; border-radius: 8px; margin: 10px; }
-    input, button { padding: 10px 15px; font-size: 16px; border-radius: 5px; border: none; margin: 5px; }
-    button { background: #5865F2; color: white; cursor: pointer; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #121212;
+      color: #f0f0f0;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    .controls {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-bottom: 16px;
+      border: 1px solid #2e2e2e;
+    }
+    input[type="text"] {
+      padding: 10px 14px;
+      font-size: 15px;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #2a2a2a;
+      color: white;
+      width: 240px;
+      margin: 5px;
+    }
+    button {
+      padding: 10px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
+      margin: 5px;
+      background: #5865F2;
+      color: white;
+      cursor: pointer;
+    }
     button:hover { background: #4752C4; }
+    button.secondary { background: #333; }
+    button.secondary:hover { background: #444; }
+    .audio-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 10px;
+      font-size: 15px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .audio-toggle input { width: 18px; height: 18px; cursor: pointer; }
+
+    /* Side-by-side default layout */
+    .video-grid {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .video-card {
+      position: relative;
+      width: 47%;
+      min-width: 320px;
+      background: #000;
+      border: 2px solid #2c2c2c;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+      object-fit: contain;
+    }
+    .label-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      pointer-events: none;
+    }
+    .expand-btn {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      border: 1px solid #555;
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+    .expand-btn:hover { background: #5865F2; }
+
+    /* Theater / Window-Fullscreen Mode for Friend's Screen */
+    body.theater-mode {
+      padding: 0;
+      overflow: hidden;
+    }
+    body.theater-mode .controls {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      opacity: 0.15;
+      transition: opacity 0.2s;
+      padding: 8px 14px;
+    }
+    body.theater-mode .controls:hover {
+      opacity: 1;
+    }
+    body.theater-mode #remote-card {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      border: none;
+      border-radius: 0;
+      z-index: 10;
+    }
+    body.theater-mode #local-card {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      width: 240px;
+      min-width: 0;
+      z-index: 15;
+      border: 2px solid #5865F2;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.8);
+    }
   </style>
 </head>
 <body>
-  <h2>Private Screen Share</h2>
-  <p>Your ID: <strong id="my-id">Connecting...</strong></p>
-  
-  <input type="text" id="friend-id" placeholder="Paste friend's ID here">
-  <button onclick="startScreenShare()">Share My Screen</button>
 
-  <div>
-    <video id="local-video" autoplay muted playsinline></video>
-    <video id="remote-video" autoplay playsinline></video>
+  <div class="controls">
+    <div>
+      Your ID: <strong id="my-id">Connecting...</strong>
+      <button class="secondary" onclick="copyId()">Copy ID</button>
+    </div>
+
+    <div style="margin-top: 8px;">
+      <input type="text" id="friend-id" placeholder="Paste friend's ID here">
+      <label class="audio-toggle">
+        <input type="checkbox" id="share-audio" checked onchange="toggleOutgoingAudio()">
+        Share Stream Audio
+      </label>
+      <button onclick="startScreenShare()">Share My Screen</button>
+    </div>
+  </div>
+
+  <div class="video-grid">
+    <div class="video-card" id="local-card">
+      <span class="label-badge">Your Screen</span>
+      <video id="local-video" autoplay muted playsinline></video>
+    </div>
+
+    <div class="video-card" id="remote-card" ondblclick="toggleTheaterMode()">
+      <span class="label-badge">Friend's Screen (Double-click to expand)</span>
+      <video id="remote-video" autoplay playsinline></video>
+      <button class="expand-btn" id="expand-btn" onclick="toggleTheaterMode()">Expand Friend's Screen</button>
+    </div>
   </div>
 
   <script>
-    // 1. Connect to PeerJS's free signaling server
     const peer = new Peer();
+    let localStream = null;
 
     peer.on('open', (id) => {
       document.getElementById('my-id').innerText = id;
     });
 
-    // 2. Listen for when your friend shares their screen with you
+    // Receive friend's screen + audio
     peer.on('call', (call) => {
-      call.answer(); // Answer the call automatically
+      call.answer();
       call.on('stream', (remoteStream) => {
-        document.getElementById('remote-video').srcObject = remoteStream;
+        const remoteVideo = document.getElementById('remote-video');
+        remoteVideo.srcObject = remoteStream;
+        remoteVideo.play().catch(() => {});
       });
     });
 
-    // 3. Capture your screen and send it to your friend
+    function copyId() {
+      const idText = document.getElementById('my-id').innerText;
+      navigator.clipboard.writeText(idText);
+    }
+
+    // Start sharing screen with optional system/tab audio (checked by default)
     async function startScreenShare() {
       const friendId = document.getElementById('friend-id').value.trim();
       if (!friendId) return alert("Enter your friend's ID first!");
 
+      const includeAudio = document.getElementById('share-audio').checked;
+
       try {
-        // Ask the browser for screen + system audio
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        localStream = await navigator.mediaDevices.getDisplayMedia({
           video: { frameRate: 30 },
-          audio: true 
+          audio: includeAudio ? {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          } : false,
+          systemAudio: includeAudio ? "include" : "exclude"
         });
 
-        document.getElementById('local-video').srcObject = screenStream;
-
-        // Call your friend and send the screen stream
-        peer.call(friendId, screenStream);
+        document.getElementById('local-video').srcObject = localStream;
+        peer.call(friendId, localStream);
       } catch (err) {
         console.error("Failed to share screen:", err);
       }
     }
+
+    // Mute/unmute your shared audio live without restarting the stream
+    function toggleOutgoingAudio() {
+      if (!localStream) return;
+      const enabled = document.getElementById('share-audio').checked;
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = enabled;
+      });
+    }
+
+    // Toggle Theater Mode (fills browser window without locking your whole monitor)
+    function toggleTheaterMode() {
+      const isTheater = document.body.classList.toggle('theater-mode');
+      document.getElementById('expand-btn').innerText = isTheater
+        ? 'Exit Expanded View (Esc)'
+        : "Expand Friend's Screen";
+    }
+
+    // Allow pressing Escape to exit Expanded View
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.body.classList.contains('theater-mode')) {
+        toggleTheaterMode();
+      }
+    });
   </script>
 </body>
 </html>
