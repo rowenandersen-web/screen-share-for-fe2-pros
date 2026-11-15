@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Victoria to Brazil Screen Share</title>
+  <title>FE2 Pros Multi-Screen Room</title>
   <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -10,17 +10,25 @@
       font-family: system-ui, -apple-system, sans-serif;
       background: #121212;
       color: #f0f0f0;
-      text-align: center;
       margin: 0;
-      padding: 20px;
+      padding: 16px;
+      text-align: center;
     }
-    .controls {
+    .lobby-box, .room-bar {
       background: #1e1e1e;
-      padding: 15px;
-      border-radius: 10px;
-      display: inline-block;
-      margin-bottom: 16px;
       border: 1px solid #2e2e2e;
+      border-radius: 10px;
+      padding: 16px;
+      max-width: 780px;
+      margin: 0 auto 16px auto;
+    }
+    .row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 8px 0;
     }
     input[type="text"] {
       padding: 10px 14px;
@@ -29,16 +37,14 @@
       border: 1px solid #444;
       background: #2a2a2a;
       color: white;
-      width: 240px;
-      margin: 5px;
+      width: 210px;
     }
     button {
       padding: 10px 16px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       border-radius: 6px;
       border: none;
-      margin: 5px;
       background: #5865F2;
       color: white;
       cursor: pointer;
@@ -46,32 +52,40 @@
     button:hover { background: #4752C4; }
     button.secondary { background: #333; }
     button.secondary:hover { background: #444; }
+    button.danger { background: #da373c; }
+    button.danger:hover { background: #a12828; }
     .audio-toggle {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      margin: 0 10px;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
       user-select: none;
     }
-    .audio-toggle input { width: 18px; height: 18px; cursor: pointer; }
+    .audio-toggle input { width: 17px; height: 17px; cursor: pointer; }
+    .status-pill {
+      background: #2a2a2a;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      color: #b5bac1;
+    }
 
-    /* Side-by-side default layout */
+    /* Multi-person responsive grid */
     .video-grid {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 14px;
+      max-width: 1600px;
+      margin: 0 auto;
     }
     .video-card {
       position: relative;
-      width: 47%;
-      min-width: 320px;
       background: #000;
       border: 2px solid #2c2c2c;
       border-radius: 10px;
       overflow: hidden;
+      aspect-ratio: 16 / 9;
     }
     video {
       width: 100%;
@@ -84,7 +98,7 @@
       position: absolute;
       top: 10px;
       left: 10px;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(0, 0, 0, 0.75);
       padding: 4px 10px;
       border-radius: 6px;
       font-size: 13px;
@@ -97,108 +111,225 @@
       background: rgba(0, 0, 0, 0.75);
       border: 1px solid #555;
       padding: 6px 12px;
-      font-size: 13px;
+      font-size: 12px;
     }
     .expand-btn:hover { background: #5865F2; }
 
-    /* Theater / Window-Fullscreen Mode for Friend's Screen */
-    body.theater-mode {
-      padding: 0;
-      overflow: hidden;
-    }
-    body.theater-mode .controls {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 20;
-      opacity: 0.15;
-      transition: opacity 0.2s;
-      padding: 8px 14px;
-    }
-    body.theater-mode .controls:hover {
-      opacity: 1;
-    }
-    body.theater-mode #remote-card {
+    /* Theater / Window-Expanded Mode for any single person's screen */
+    .video-card.expanded {
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
+      aspect-ratio: auto;
+      z-index: 50;
       border: none;
       border-radius: 0;
-      z-index: 10;
     }
-    body.theater-mode #local-card {
-      position: fixed;
-      bottom: 16px;
-      left: 16px;
-      width: 240px;
-      min-width: 0;
-      z-index: 15;
-      border: 2px solid #5865F2;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.8);
-    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
-  <div class="controls">
-    <div>
-      Your ID: <strong id="my-id">Connecting...</strong>
-      <button class="secondary" onclick="copyId()">Copy ID</button>
+  <!-- STEP 1: LOBBY (CREATE OR JOIN A ROOM) -->
+  <div id="lobby" class="lobby-box">
+    <h2 style="margin-top: 0;">FE2 Pros Multi-Screen Room</h2>
+    <div class="row">
+      <input type="text" id="username-input" placeholder="Your nickname (e.g. Rowen)" maxlength="18">
+    </div>
+    <div class="row" style="margin-top: 14px;">
+      <button onclick="createRoom()">Create New Room</button>
+      <span style="color: #888;">or</span>
+      <input type="text" id="join-code-input" placeholder="Enter Room Code">
+      <button class="secondary" onclick="joinRoom()">Join Room</button>
+    </div>
+    <p id="lobby-status" style="color: #f39c12; font-size: 14px; margin-bottom: 0;"></p>
+  </div>
+
+  <!-- STEP 2: ACTIVE ROOM CONTROLS -->
+  <div id="room-bar" class="room-bar hidden">
+    <div class="row">
+      <span>Room Code: <strong id="display-room-code" style="font-size: 18px; color: #7289da;"></strong></span>
+      <button class="secondary" onclick="copyRoomCode()">Copy Code</button>
+      <span class="status-pill" id="member-count">1 person in room</span>
     </div>
 
-    <div style="margin-top: 8px;">
-      <input type="text" id="friend-id" placeholder="Paste friend's ID here">
+    <div class="row">
       <label class="audio-toggle">
         <input type="checkbox" id="share-audio" checked onchange="toggleOutgoingAudio()">
         Share Stream Audio
       </label>
-      <button onclick="startScreenShare()">Share My Screen</button>
+      <button id="share-btn" onclick="startScreenShare()">Share My Screen</button>
+      <button id="stop-btn" class="danger hidden" onclick="stopScreenShare()">Stop Sharing</button>
     </div>
   </div>
 
-  <div class="video-grid">
-    <div class="video-card" id="local-card">
-      <span class="label-badge">Your Screen</span>
-      <video id="local-video" autoplay muted playsinline></video>
-    </div>
-
-    <div class="video-card" id="remote-card" ondblclick="toggleTheaterMode()">
-      <span class="label-badge">Friend's Screen (Double-click to expand)</span>
-      <video id="remote-video" autoplay playsinline></video>
-      <button class="expand-btn" id="expand-btn" onclick="toggleTheaterMode()">Expand Friend's Screen</button>
-    </div>
-  </div>
+  <!-- MULTI-SCREEN GRID -->
+  <div id="video-grid" class="video-grid"></div>
 
   <script>
-    const peer = new Peer();
+    let peer = null;
+    let myName = 'Player';
+    let roomCode = '';
+    let isHost = false;
     let localStream = null;
 
-    peer.on('open', (id) => {
-      document.getElementById('my-id').innerText = id;
-    });
+    // Track all connected peers: peerId -> { conn, name, call }
+    const peers = {};
 
-    // Receive friend's screen + audio
-    peer.on('call', (call) => {
-      call.answer();
-      call.on('stream', (remoteStream) => {
-        const remoteVideo = document.getElementById('remote-video');
-        remoteVideo.srcObject = remoteStream;
-        remoteVideo.play().catch(() => {});
-      });
-    });
-
-    function copyId() {
-      const idText = document.getElementById('my-id').innerText;
-      navigator.clipboard.writeText(idText);
+    function getNickname() {
+      const val = document.getElementById('username-input').value.trim();
+      return val || 'Player-' + Math.floor(100 + Math.random() * 900);
     }
 
-    // Start sharing screen with optional system/tab audio (checked by default)
-    async function startScreenShare() {
-      const friendId = document.getElementById('friend-id').value.trim();
-      if (!friendId) return alert("Enter your friend's ID first!");
+    function generateRoomCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+      return code;
+    }
 
+    // HOST: Create a room using the room code as the PeerJS ID
+    function createRoom() {
+      myName = getNickname();
+      isHost = true;
+      roomCode = generateRoomCode();
+      document.getElementById('lobby-status').innerText = 'Creating room...';
+
+      peer = new Peer('fe2room-' + roomCode);
+
+      peer.on('open', () => {
+        enterRoomUI();
+      });
+
+      peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+          createRoom(); // Retry with a fresh code if taken
+        } else {
+          document.getElementById('lobby-status').innerText = 'Connection error: ' + err.type;
+        }
+      });
+
+      setupPeerListeners();
+    }
+
+    // GUEST: Join an existing room code
+    function joinRoom() {
+      myName = getNickname();
+      const rawCode = document.getElementById('join-code-input').value.trim().toUpperCase();
+      if (!rawCode) return alert('Enter a room code first!');
+
+      isHost = false;
+      roomCode = rawCode;
+      document.getElementById('lobby-status').innerText = 'Joining room ' + roomCode + '...';
+
+      peer = new Peer(); // Random guest ID
+
+      peer.on('open', () => {
+        const hostConn = peer.connect('fe2room-' + roomCode, { reliable: true });
+        hostConn.on('open', () => {
+          registerDataConnection(hostConn);
+          hostConn.send({ type: 'hello', name: myName });
+          enterRoomUI();
+        });
+      });
+
+      peer.on('error', (err) => {
+        document.getElementById('lobby-status').innerText =
+          err.type === 'peer-unavailable'
+            ? 'Room "' + roomCode + '" not found! Check the code.'
+            : 'Error: ' + err.type;
+      });
+
+      setupPeerListeners();
+    }
+
+    function enterRoomUI() {
+      document.getElementById('lobby').classList.add('hidden');
+      document.getElementById('room-bar').classList.remove('hidden');
+      document.getElementById('display-room-code').innerText = roomCode;
+      updateMemberCount();
+    }
+
+    function setupPeerListeners() {
+      // Handle incoming data connections (from new guests or mesh introductions)
+      peer.on('connection', (conn) => {
+        conn.on('open', () => {
+          registerDataConnection(conn);
+          conn.send({ type: 'hello', name: myName });
+        });
+      });
+
+      // Handle incoming screen share streams from anyone in the room
+      peer.on('call', (call) => {
+        call.answer();
+        const senderName = (call.metadata && call.metadata.name) || (peers[call.peer] && peers[call.peer].name) || 'Friend';
+        call.on('stream', (remoteStream) => {
+          addOrUpdateVideoCard(call.peer, senderName + "'s Screen", remoteStream, false);
+        });
+        call.on('close', () => removeVideoCard(call.peer));
+      });
+    }
+
+    function registerDataConnection(conn) {
+      const remoteId = conn.peer;
+      if (!peers[remoteId]) peers[remoteId] = {};
+      peers[remoteId].conn = conn;
+
+      conn.on('data', (data) => {
+        if (data.type === 'hello') {
+          peers[remoteId].name = data.name;
+          updateMemberCount();
+
+          // If we are the Host, send the newcomer a list of all existing room members so they connect in a mesh
+          if (isHost) {
+            const existingIds = Object.keys(peers).filter(id => id !== remoteId && peers[id].conn && peers[id].conn.open);
+            conn.send({ type: 'peer-list', peerIds: existingIds });
+          }
+
+          // If we are already sharing our screen, automatically stream it to this new person!
+          if (localStream) {
+            callPeerWithScreen(remoteId);
+          }
+        }
+
+        // Guest receives list of other members from Host and connects directly to each one
+        if (data.type === 'peer-list') {
+          data.peerIds.forEach((otherId) => {
+            if (!peers[otherId]) {
+              const meshConn = peer.connect(otherId, { reliable: true });
+              meshConn.on('open', () => {
+                registerDataConnection(meshConn);
+                meshConn.send({ type: 'hello', name: myName });
+              });
+            }
+          });
+        }
+
+        if (data.type === 'stopped-sharing') {
+          removeVideoCard(remoteId);
+        }
+      });
+
+      conn.on('close', () => {
+        delete peers[remoteId];
+        removeVideoCard(remoteId);
+        updateMemberCount();
+      });
+    }
+
+    function updateMemberCount() {
+      const total = Object.keys(peers).length + 1;
+      document.getElementById('member-count').innerText =
+        total === 1 ? '1 person in room' : total + ' people in room';
+    }
+
+    function copyRoomCode() {
+      navigator.clipboard.writeText(roomCode);
+    }
+
+    // Start sharing screen to EVERY person in the room
+    async function startScreenShare() {
       const includeAudio = document.getElementById('share-audio').checked;
 
       try {
@@ -209,37 +340,114 @@
             noiseSuppression: false,
             autoGainControl: false
           } : false,
-          systemAudio: includeAudio ? "include" : "exclude"
+          systemAudio: includeAudio ? 'include' : 'exclude'
         });
 
-        document.getElementById('local-video').srcObject = localStream;
-        peer.call(friendId, localStream);
+        // Show your own screen preview
+        addOrUpdateVideoCard('local', myName + ' (You)', localStream, true);
+
+        document.getElementById('share-btn').classList.add('hidden');
+        document.getElementById('stop-btn').classList.remove('hidden');
+
+        // Handle user clicking browser's built-in "Stop sharing" bar
+        localStream.getVideoTracks()[0].onended = () => stopScreenShare();
+
+        // Stream to everyone currently in the room
+        Object.keys(peers).forEach((peerId) => callPeerWithScreen(peerId));
       } catch (err) {
-        console.error("Failed to share screen:", err);
+        console.error('Screen share cancelled or failed:', err);
       }
     }
 
-    // Mute/unmute your shared audio live without restarting the stream
-    function toggleOutgoingAudio() {
+    function callPeerWithScreen(peerId) {
       if (!localStream) return;
-      const enabled = document.getElementById('share-audio').checked;
-      localStream.getAudioTracks().forEach(track => {
-        track.enabled = enabled;
+      const call = peer.call(peerId, localStream, { metadata: { name: myName } });
+      if (peers[peerId]) peers[peerId].call = call;
+    }
+
+    function stopScreenShare() {
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+      }
+      removeVideoCard('local');
+      document.getElementById('share-btn').classList.remove('hidden');
+      document.getElementById('stop-btn').classList.add('hidden');
+
+      // Tell everyone in the room to remove our video card
+      Object.values(peers).forEach(p => {
+        if (p.conn && p.conn.open) p.conn.send({ type: 'stopped-sharing' });
+        if (p.call) p.call.close();
       });
     }
 
-    // Toggle Theater Mode (fills browser window without locking your whole monitor)
-    function toggleTheaterMode() {
-      const isTheater = document.body.classList.toggle('theater-mode');
-      document.getElementById('expand-btn').innerText = isTheater
-        ? 'Exit Expanded View (Esc)'
-        : "Expand Friend's Screen";
+    function toggleOutgoingAudio() {
+      if (!localStream) return;
+      const enabled = document.getElementById('share-audio').checked;
+      localStream.getAudioTracks().forEach(track => track.enabled = enabled);
     }
 
-    // Allow pressing Escape to exit Expanded View
+    // Dynamically add/update a video card in the grid for any person sharing
+    function addOrUpdateVideoCard(id, label, stream, isMuted) {
+      let card = document.getElementById('card-' + id);
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'video-card';
+        card.id = 'card-' + id;
+        card.ondblclick = () => toggleExpandCard(card);
+
+        const badge = document.createElement('span');
+        badge.className = 'label-badge';
+        badge.innerText = label;
+
+        const video = document.createElement('video');
+        video.autoplay = true;
+        video.playsInline = true;
+        video.muted = isMuted;
+
+        const btn = document.createElement('button');
+        btn.className = 'expand-btn';
+        btn.innerText = 'Expand Screen';
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          toggleExpandCard(card);
+        };
+
+        card.appendChild(badge);
+        card.appendChild(video);
+        card.appendChild(btn);
+        document.getElementById('video-grid').appendChild(card);
+      }
+
+      const videoEl = card.querySelector('video');
+      videoEl.srcObject = stream;
+      videoEl.play().catch(() => {});
+    }
+
+    function removeVideoCard(id) {
+      const card = document.getElementById('card-' + id);
+      if (card) card.remove();
+    }
+
+    // Expand ANY person's screen to fill the browser window (or press Esc to shrink back)
+    function toggleExpandCard(card) {
+      const expanding = !card.classList.contains('expanded');
+      document.querySelectorAll('.video-card.expanded').forEach(c => {
+        c.classList.remove('expanded');
+        c.querySelector('.expand-btn').innerText = 'Expand Screen';
+      });
+      if (expanding) {
+        card.classList.add('expanded');
+        card.querySelector('.expand-btn').innerText = 'Exit Expanded (Esc)';
+      }
+    }
+
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && document.body.classList.contains('theater-mode')) {
-        toggleTheaterMode();
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.video-card.expanded').forEach(c => {
+          c.classList.remove('expanded');
+          c.querySelector('.expand-btn').innerText = 'Expand Screen';
+        });
       }
     });
   </script>
